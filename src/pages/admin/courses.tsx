@@ -76,16 +76,27 @@ const initialCourses: Course[] = [
   },
 ];
 
+const normalizeInstructorNames = (courses: Course[]): Course[] =>
+  courses.map((course) => ({
+    ...course,
+    instructors: course.instructors.map((instructor) =>
+      instructor.toUpperCase(),
+    ),
+  }));
+
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem(COURSES_STORAGE_KEY);
 
-    if (!saved) return initialCourses;
+    if (!saved) return normalizeInstructorNames(initialCourses);
 
     try {
-      return JSON.parse(saved) as Course[];
+      const parsed = JSON.parse(saved) as Course[];
+      return Array.isArray(parsed)
+        ? normalizeInstructorNames(parsed)
+        : normalizeInstructorNames(initialCourses);
     } catch {
-      return initialCourses;
+      return normalizeInstructorNames(initialCourses);
     }
   });
 
@@ -156,7 +167,8 @@ export default function AdminCoursesPage() {
         instructor.toLowerCase() === typedName.toLowerCase(),
     );
 
-    const instructorName = existingName ?? typedName;
+    const instructorName =
+      existingName?.toUpperCase() ?? typedName.toUpperCase();
 
     setSelectedInstructors((current) =>
       current.includes(instructorName)
@@ -291,7 +303,7 @@ export default function AdminCoursesPage() {
                             variant="outline"
                             className={instructorBadgeClass}
                           >
-                            {instructor}
+                            {instructor.toUpperCase()}
                             <button
                               type="button"
                               className="ml-1 rounded-full text-blue-300 hover:text-white"
