@@ -1,7 +1,15 @@
-import { useState } from "react";
-import { PlusCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, PlusCircle, X } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +20,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -27,214 +40,438 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEnrollmentStore } from "@/lib/enrollment-store";
 
-type Option = { value: string; label: string };
+const COURSES_STORAGE_KEY = "admin-courses";
 
-function OptionSelect({
-  id,
-  options,
-  value,
-  onChange,
-  placeholder,
-}: {
+const studentBadgeClass =
+  "border-blue-800 bg-blue-950/60 text-blue-200";
+
+type AdminCourse = {
   id: string;
-  options: Option[];
-  value: string | null;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <Select
-      items={options}
-      value={value}
-      onValueChange={(v) => onChange(v as string)}
-    >
-      <SelectTrigger id={id} className="w-full">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
+  code: string;
+  name: string;
+  instructors: string[];
+};
 
 export default function AdminEnrollmentsPage() {
-  const { students, courses, enrollments, enroll } = useEnrollmentStore();
+  const {
+    students,
+    addCourseToStudent,
+    removeCourseFromStudent,
+  } = useEnrollmentStore();
 
-  const [formStudent, setFormStudent] = useState<string | null>(null);
-  const [formCourse, setFormCourse] = useState<string | null>(null);
-  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
-  const [mode, setMode] = useState<"course" | "student">("course");
-  const [filterCourse, setFilterCourse] = useState("all");
-  const [filterStudent, setFilterStudent] = useState("all");
-
-  const studentOptions: Option[] = students.map((s) => ({
-    value: s.studentId,
-    label: `${s.studentId} — ${s.firstName} ${s.lastName}`,
-  }));
-  const courseOptions: Option[] = courses.map((c) => ({
-    value: c.courseId,
-    label: `${c.courseId} — ${c.courseTitle}`,
-  }));
-
-  // วิชาที่นักศึกษาที่เลือกยังไม่ได้ลงทะเบียน
-  const availableCourseOptions = courseOptions.filter(
-    (c) =>
-      !enrollments.some(
-        (e) => e.studentId === formStudent && e.courseId === c.value
-      )
+  const [adminCourses, setAdminCourses] = useState<AdminCourse[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [studentPopoverOpen, setStudentPopoverOpen] = useState(false);
+  const [formCourse, setFormCourse] = useState("");
+  const [formStudents, setFormStudents] = useState<string[]>([]);
+  const [searchType, setSearchType] = useState<"course" | "student">(
+    "course",
   );
+  const [selectedCourse, setSelectedCourse] = useState("all");
+  const [selectedStudent, setSelectedStudent] = useState("all");
 
-  const handleEnroll = () => {
-    if (!formStudent || !formCourse) return;
-    enroll(formStudent, formCourse);
-    setEnrollDialogOpen(false);
-  };
+  const loadCourses = () => {
+    const savedCourses = localStorage.getItem(COURSES_STORAGE_KEY);
 
-  // เคลียร์ฟอร์มทุกครั้งที่ Dialog ปิด ไม่ว่าจะปิดเพราะลงทะเบียนสำเร็จ, กด X,
-  // หรือคลิกนอก Dialog — เปิดครั้งหน้าจะได้เริ่มจากฟอร์มว่างเสมอ
-  const handleEnrollDialogOpenChange = (open: boolean) => {
-    setEnrollDialogOpen(open);
-    if (!open) {
-      setFormStudent(null);
-      setFormCourse(null);
+    if (!savedCourses) {
+      setAdminCourses([]);
+      return;
+    }
+
+    try {
+      const parsedCourses = JSON.parse(savedCourses) as AdminCourse[];
+      setAdminCourses(Array.isArray(parsedCourses) ? parsedCourses : []);
+    } catch {
+      setAdminCourses([]);
     }
   };
 
-  const rows = enrollments.filter((e) =>
-    mode === "course"
-      ? filterCourse === "all" || e.courseId === filterCourse
-      : filterStudent === "all" || e.studentId === filterStudent
+  useEffect(() => {
+    loadCourses();
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === COURSES_STORAGE_KEY) loadCourses();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  const availableStudents = students.filter(
+    (student) =>
+      Boolean(formCourse) &&
+      !student.enrolledCourses.includes(formCourse),
   );
 
-  const nameOf = (studentId: string) => {
-    const s = students.find((x) => x.studentId === studentId);
-    return s ? `${s.firstName} ${s.lastName}` : "-";
+  const getCourseStudents = (courseCode: string) =>
+    students.filter((student) =>
+      student.enrolledCourses.includes(courseCode),
+    );
+
+  const getStudentName = (studentId: string) => {
+    const student = students.find(
+      (item) => item.studentId === studentId,
+    );
+
+    return student
+      ? `${student.firstName} ${student.lastName}`
+      : studentId;
   };
-  const titleOf = (courseId: string) =>
-    courses.find((c) => c.courseId === courseId)?.courseTitle ?? "-";
+
+  const visibleCourses = adminCourses.filter((course) => {
+    if (searchType === "course") {
+      return (
+        selectedCourse === "all" ||
+        course.code === selectedCourse
+      );
+    }
+
+    if (selectedStudent === "all") return true;
+
+    const student = students.find(
+      (item) => item.studentId === selectedStudent,
+    );
+
+    return student?.enrolledCourses.includes(course.code);
+  });
+
+  const toggleStudent = (studentId: string) => {
+    setFormStudents((current) =>
+      current.includes(studentId)
+        ? current.filter((id) => id !== studentId)
+        : [...current, studentId],
+    );
+  };
+
+  const handleCourseChange = (courseCode: string) => {
+    setFormCourse(courseCode);
+    setFormStudents([]);
+    setStudentPopoverOpen(false);
+  };
+
+  const handleEnroll = () => {
+    if (!formCourse || formStudents.length === 0) return;
+
+    formStudents.forEach((studentId) => {
+      addCourseToStudent(studentId, formCourse);
+    });
+
+    setFormCourse("");
+    setFormStudents([]);
+    setStudentPopoverOpen(false);
+    setDialogOpen(false);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open);
+
+    if (!open) {
+      setFormCourse("");
+      setFormStudents([]);
+      setStudentPopoverOpen(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">จัดการการลงทะเบียน</h1>
+
         <p className="text-sm text-muted-foreground">
           Admin ลงทะเบียนและยกเลิกการลงทะเบียนให้นักศึกษาได้ทุกคน
         </p>
+
+        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+          <DialogTrigger asChild>
+            <Button className="mt-3">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              ลงทะเบียนให้นักศึกษา
+            </Button>
+          </DialogTrigger>
+
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>ลงทะเบียนให้นักศึกษา</DialogTitle>
+              <DialogDescription>
+                เลือกวิชาก่อน แล้วเลือกนักศึกษาได้หลายคน
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>วิชา</Label>
+
+                <Select
+                  value={formCourse}
+                  onValueChange={handleCourseChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกวิชา" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {adminCourses.length === 0 ? (
+                      <SelectItem value="ไม่มีวิชา" disabled>
+                        ยังไม่มีวิชาในตารางจัดการวิชาเรียน
+                      </SelectItem>
+                    ) : (
+                      adminCourses.map((course) => (
+                        <SelectItem key={course.id} value={course.code}>
+                          {course.code} — {course.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>นักศึกษา</Label>
+
+                <Popover
+                  open={studentPopoverOpen}
+                  onOpenChange={setStudentPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!formCourse}
+                      className="min-h-11 w-full justify-start px-3"
+                    >
+                      {formStudents.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {formStudents.map((studentId) => (
+                            <Badge
+                              key={studentId}
+                              variant="outline"
+                              className={studentBadgeClass}
+                            >
+                              {getStudentName(studentId)}
+
+                              <button
+                                type="button"
+                                className="ml-1 rounded-full text-blue-300 hover:text-white"
+                                onMouseDown={(event) =>
+                                  event.preventDefault()
+                                }
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleStudent(studentId);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {formCourse
+                            ? "เลือกนักศึกษา (ได้หลายคน)"
+                            : "กรุณาเลือกวิชาก่อน"}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent
+                    align="start"
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                  >
+                    <Command>
+                      <CommandInput placeholder="ค้นหานักศึกษา..." />
+
+                      <CommandList>
+                        <CommandEmpty>
+                          ไม่พบนักศึกษาที่ยังไม่ได้ลงทะเบียน
+                        </CommandEmpty>
+
+                        {availableStudents.map((student) => {
+                          const selected = formStudents.includes(
+                            student.studentId,
+                          );
+
+                          return (
+                            <CommandItem
+                              key={student.studentId}
+                              value={`${student.studentId} ${student.firstName} ${student.lastName}`}
+                              onSelect={() =>
+                                toggleStudent(student.studentId)
+                              }
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  selected
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
+                              />
+                              {student.studentId} —{" "}
+                              {student.firstName} {student.lastName}
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                disabled={!formCourse || formStudents.length === 0}
+                onClick={handleEnroll}
+              >
+                ลงทะเบียน ({formStudents.length} คน)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Dialog open={enrollDialogOpen} onOpenChange={handleEnrollDialogOpenChange}>
-        <DialogTrigger render={<Button />}>
-          <PlusCircle className="h-4 w-4" />
-          ลงทะเบียนให้นักศึกษา
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ลงทะเบียนให้นักศึกษา</DialogTitle>
-            <DialogDescription>
-              เลือกนักศึกษาก่อน แล้วเลือกวิชาที่ยังไม่ได้ลงทะเบียน
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="formStudent">นักศึกษา</Label>
-              <OptionSelect
-                id="formStudent"
-                options={studentOptions}
-                value={formStudent}
-                placeholder="เลือกนักศึกษา"
-                onChange={(v) => {
-                  setFormStudent(v);
-                  setFormCourse(null);
-                }}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="formCourse">วิชา</Label>
-              <OptionSelect
-                id="formCourse"
-                options={availableCourseOptions}
-                value={formCourse}
-                placeholder={
-                  formStudent && availableCourseOptions.length === 0
-                    ? "ลงทะเบียนครบทุกวิชาแล้ว"
-                    : "เลือกวิชา"
-                }
-                onChange={setFormCourse}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button disabled={!formStudent || !formCourse} onClick={handleEnroll}>
-              <PlusCircle className="h-4 w-4" />
-              ลงทะเบียน
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Tabs
-        value={mode}
-        onValueChange={(v) => setMode(v as "course" | "student")}
+        value={searchType}
+        onValueChange={(value) =>
+          setSearchType(value as "course" | "student")
+        }
+        className="w-fit"
       >
         <TabsList>
           <TabsTrigger value="course">ค้นหาตามวิชา</TabsTrigger>
           <TabsTrigger value="student">ค้นหาตามนักศึกษา</TabsTrigger>
         </TabsList>
-        <TabsContent value="course" className="pt-2">
-          <OptionSelect
-            id="filterCourse"
-            options={[{ value: "all", label: "ทุกวิชา" }, ...courseOptions]}
-            value={filterCourse}
-            onChange={setFilterCourse}
-          />
-        </TabsContent>
-        <TabsContent value="student" className="pt-2">
-          <OptionSelect
-            id="filterStudent"
-            options={[{ value: "all", label: "ทุกคน" }, ...studentOptions]}
-            value={filterStudent}
-            onChange={setFilterStudent}
-          />
-        </TabsContent>
       </Tabs>
+
+      {searchType === "course" ? (
+        <Select
+          value={selectedCourse}
+          onValueChange={setSelectedCourse}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="ทุกวิชา" />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="all">ทุกวิชา</SelectItem>
+
+            {adminCourses.map((course) => (
+              <SelectItem key={course.id} value={course.code}>
+                {course.code} — {course.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Select
+          value={selectedStudent}
+          onValueChange={setSelectedStudent}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="ทุกคน" />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="all">ทุกคน</SelectItem>
+
+            {students.map((student) => (
+              <SelectItem
+                key={student.studentId}
+                value={student.studentId}
+              >
+                {student.studentId} — {getStudentName(student.studentId)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>รหัสนักศึกษา</TableHead>
-              <TableHead>ชื่อ-นามสกุล</TableHead>
               <TableHead>รหัสวิชา</TableHead>
               <TableHead>ชื่อวิชา</TableHead>
+              <TableHead className="w-[140px]">
+                จำนวน นศ.
+              </TableHead>
+              <TableHead>นักศึกษาที่ลงทะเบียน</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {rows.length === 0 && (
+            {visibleCourses.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={4}
-                  className="h-20 text-center text-muted-foreground"
+                  className="py-8 text-center text-muted-foreground"
                 >
                   ไม่พบข้อมูลการลงทะเบียน
                 </TableCell>
               </TableRow>
+            ) : (
+              visibleCourses.map((course) => {
+                const enrolledStudents = getCourseStudents(course.code);
+
+                return (
+                  <TableRow key={course.id}>
+                    <TableCell className="font-medium">
+                      {course.code}
+                    </TableCell>
+
+                    <TableCell>{course.name}</TableCell>
+
+                    <TableCell>{enrolledStudents.length}</TableCell>
+
+                    <TableCell>
+                      {enrolledStudents.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {enrolledStudents.map((student) => (
+                            <Badge
+                              key={student.studentId}
+                              variant="outline"
+                              className={studentBadgeClass}
+                            >
+                              {getStudentName(student.studentId)}
+
+                              <button
+                                type="button"
+                                className="ml-1 rounded-full text-blue-300 hover:text-white"
+                                aria-label={`ลบ ${getStudentName(
+                                  student.studentId,
+                                )}`}
+                                onMouseDown={(event) =>
+                                  event.preventDefault()
+                                }
+                                onClick={() =>
+                                  removeCourseFromStudent(
+                                    student.studentId,
+                                    course.code,
+                                  )
+                                }
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          ยังไม่มีนักศึกษาลงทะเบียน
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
-            {rows.map((e) => (
-              <TableRow key={`${e.studentId}-${e.courseId}`}>
-                <TableCell>{e.studentId}</TableCell>
-                <TableCell>{nameOf(e.studentId)}</TableCell>
-                <TableCell>{e.courseId}</TableCell>
-                <TableCell>{titleOf(e.courseId)}</TableCell>
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
       </div>

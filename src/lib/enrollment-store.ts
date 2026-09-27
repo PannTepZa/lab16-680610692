@@ -1,56 +1,80 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-import {
-  students as initialStudents,
-  courses as initialCourses,
-  enrollments as initialEnrollments,
-} from "@/lib/mock-data";
-import type { Course, Enrollment, Student } from "@/lib/types";
+import { courses as initialCourses, students as initialStudents } from "@/lib/mock-data";
+import type { Course, Student } from "@/lib/types";
 
 type EnrollmentStore = {
   students: Student[];
   courses: Course[];
-  enrollments: Enrollment[];
   /** Admin ลงทะเบียนวิชาให้นักศึกษาคนใดก็ได้ (ไม่ซ้ำกับที่มีอยู่แล้ว) */
-  enroll: (studentId: string, courseId: string) => void;
+  addCourseToStudent: (studentId: string, courseId: string) => void;
   /** Admin ยกเลิกการลงทะเบียนของนักศึกษาคนใดก็ได้ */
-  drop: (studentId: string, courseId: string) => void;
-  /** ลบนักศึกษา พร้อมการลงทะเบียนทั้งหมดของคนนั้น */
+  removeCourseFromStudent: (studentId: string, courseId: string) => void;
+  /** ลบนักศึกษา */
   removeStudent: (studentId: string) => void;
-  /** ลบวิชาออกจากรายวิชาที่เปิดสอน พร้อม cascade ลบ enrollment ที่อ้างถึงวิชานั้นทั้งหมด */
+  /** ลบวิชาออกจากรายวิชาที่เปิดสอน พร้อม cascade ลบ courseId ออกจาก enrolledCourses ของนักศึกษาทุกคน */
   removeCourse: (courseId: string) => void;
 };
 
-export const useEnrollmentStore = create<EnrollmentStore>((set) => ({
-  students: initialStudents,
-  courses: initialCourses,
-  enrollments: initialEnrollments,
+export const useEnrollmentStore = create<EnrollmentStore>()(
+  persist(
+    (set) => ({
+      students: initialStudents,
+      courses: initialCourses,
 
-  enroll: (studentId, courseId) =>
-    set((state) => ({
-      enrollments: state.enrollments.some(
-        (e) => e.studentId === studentId && e.courseId === courseId,
-      )
-        ? state.enrollments
-        : [...state.enrollments, { studentId, courseId }],
-    })),
+      addCourseToStudent: (studentId, courseId) =>
+        set((state) => ({
+          students: state.students.map((student) => {
+            if (student.studentId !== studentId) return student;
+            if (student.enrolledCourses.includes(courseId)) return student;
 
-  drop: (studentId, courseId) =>
-    set((state) => ({
-      enrollments: state.enrollments.filter(
-        (e) => !(e.studentId === studentId && e.courseId === courseId),
-      ),
-    })),
+            return {
+              ...student,
+              enrolledCourses: [...student.enrolledCourses, courseId],
+            };
+          }),
+        })),
 
-  removeStudent: (studentId) =>
-    set((state) => ({
-      students: state.students.filter((s) => s.studentId !== studentId),
-      enrollments: state.enrollments.filter((e) => e.studentId !== studentId),
-    })),
+      removeCourseFromStudent: (studentId, courseId) =>
+        set((state) => ({
+          students: state.students.map((student) =>
+            student.studentId !== studentId
+              ? student
+              : {
+                  ...student,
+                  enrolledCourses: student.enrolledCourses.filter(
+                    (value) => value !== courseId,
+                  ),
+                },
+          ),
+        })),
 
-  removeCourse: (courseId) =>
-    set((state) => ({
-      courses: state.courses.filter((c) => c.courseId !== courseId),
-      enrollments: state.enrollments.filter((e) => e.courseId !== courseId),
-    })),
-}));
+      removeStudent: (studentId) =>
+        set((state) => ({
+          students: state.students.filter(
+            (student) => student.studentId !== studentId,
+          ),
+        })),
+
+      removeCourse: (courseId) =>
+        set((state) => ({
+          courses: state.courses.filter((course) => course.courseCode !== courseId),
+          students: state.students.map((student) => ({
+            ...student,
+            enrolledCourses: student.enrolledCourses.filter(
+              (value) => value !== courseId,
+            ),
+          })),
+        })),
+    }),
+    {
+      name: "lab16-2569-students",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        students: state.students,
+        courses: state.courses,
+      }),
+    },
+  ),
+);
