@@ -14,27 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -108,6 +95,7 @@ export default function AdminCoursesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [instructorOpen, setInstructorOpen] = useState(false);
+  const [activeInstructorIndex, setActiveInstructorIndex] = useState(0);
   const [deleteCourse, setDeleteCourse] = useState<Course | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -117,8 +105,21 @@ export default function AdminCoursesPage() {
   );
 
   const availableInstructors = Array.from(
-    new Set(courses.flatMap((course) => course.instructors)),
+    new Set([
+      ...courses.flatMap((course) => course.instructors),
+      ...selectedInstructors,
+    ]),
   );
+  const instructorQuery = newInstructor.trim();
+  const matchingInstructors = availableInstructors.filter((instructor) =>
+    instructor.toLowerCase().includes(instructorQuery.toLowerCase()),
+  );
+  const canAddInstructor =
+    Boolean(instructorQuery) &&
+    !availableInstructors.some(
+      (instructor) =>
+        instructor.toLowerCase() === instructorQuery.toLowerCase(),
+    );
 
   const normalizedCode = code.trim().toUpperCase();
 
@@ -134,6 +135,7 @@ export default function AdminCoursesPage() {
     setNewInstructor("");
     setSelectedInstructors([]);
     setInstructorOpen(false);
+    setActiveInstructorIndex(0);
   };
 
   const toggleInstructor = (instructor: string) => {
@@ -163,6 +165,33 @@ export default function AdminCoursesPage() {
     );
 
     setNewInstructor("");
+    setActiveInstructorIndex(0);
+    setInstructorOpen(true);
+  };
+
+  const instructorOptions = [
+    ...(canAddInstructor
+      ? [{ type: "new" as const, name: instructorQuery }]
+      : []),
+    ...matchingInstructors.map((name) => ({
+      type: "existing" as const,
+      name,
+    })),
+  ];
+
+  const selectInstructorOption = (index: number) => {
+    const option = instructorOptions[index];
+    if (!option) return;
+
+    if (option.type === "new") {
+      addNewInstructor();
+      return;
+    }
+
+    toggleInstructor(option.name);
+    setNewInstructor("");
+    setActiveInstructorIndex(0);
+    setInstructorOpen(true);
   };
 
   const removeInstructor = (courseId: string, instructor: string) => {
@@ -308,12 +337,9 @@ export default function AdminCoursesPage() {
           if (!open) resetForm();
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>เพิ่มวิชาใหม่</DialogTitle>
-            <DialogDescription>
-              วิชาที่เพิ่มจะแสดงในรายการทันที
-            </DialogDescription>
+            <DialogTitle>เพิ่มวิชาเรียน</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
@@ -323,7 +349,7 @@ export default function AdminCoursesPage() {
                 id="course-code"
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
-                placeholder="เช่น CPE303"
+                placeholder="เช่น CS101"
                 aria-invalid={duplicateCode}
                 className={duplicateCode ? "border-destructive" : ""}
               />
@@ -341,114 +367,148 @@ export default function AdminCoursesPage() {
                 id="course-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="เช่น Mobile Application Development"
+                placeholder="เช่น Introduction to Programming"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label>ผู้สอน</Label>
+              <Label htmlFor="course-instructors">ผู้สอน</Label>
+              <div className="relative">
+                <div className="flex min-h-11 w-full flex-wrap items-center gap-1 rounded-lg border border-input bg-transparent px-2.5 py-1 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
+                  {selectedInstructors.map((instructor) => (
+                    <Badge
+                      key={instructor}
+                      variant="outline"
+                      className={instructorBadgeClass}
+                    >
+                      {instructor}
+                      <button
+                        type="button"
+                        className="ml-1 rounded-full text-blue-300 hover:text-white"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => toggleInstructor(instructor)}
+                        aria-label={`ลบผู้สอน ${instructor}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <input
+                    id="course-instructors"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={instructorOpen}
+                    aria-controls="course-instructor-options"
+                    aria-activedescendant={
+                      instructorOpen && instructorOptions.length > 0
+                        ? `course-instructor-option-${activeInstructorIndex}`
+                        : undefined
+                    }
+                    autoComplete="off"
+                    className="h-8 min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    value={newInstructor}
+                    onChange={(event) => {
+                      setNewInstructor(event.target.value);
+                      setActiveInstructorIndex(0);
+                      setInstructorOpen(true);
+                    }}
+                    onFocus={() => setInstructorOpen(true)}
+                    onBlur={() => setInstructorOpen(false)}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowDown" && instructorOptions.length) {
+                        event.preventDefault();
+                        setInstructorOpen(true);
+                        setActiveInstructorIndex((current) =>
+                          Math.min(current + 1, instructorOptions.length - 1),
+                        );
+                      } else if (
+                        event.key === "ArrowUp" &&
+                        instructorOptions.length
+                      ) {
+                        event.preventDefault();
+                        setActiveInstructorIndex((current) =>
+                          Math.max(current - 1, 0),
+                        );
+                      } else if (
+                        event.key === "Enter" &&
+                        instructorOpen &&
+                        instructorOptions.length
+                      ) {
+                        event.preventDefault();
+                        selectInstructorOption(activeInstructorIndex);
+                      } else if (event.key === "Escape") {
+                        setInstructorOpen(false);
+                      } else if (
+                        event.key === "Backspace" &&
+                        !newInstructor &&
+                        selectedInstructors.length > 0
+                      ) {
+                        toggleInstructor(
+                          selectedInstructors[selectedInstructors.length - 1],
+                        );
+                      }
+                    }}
+                    placeholder={
+                      selectedInstructors.length === 0
+                        ? "เลือกหรือพิมพ์ชื่อผู้สอน (ได้หลายคน)"
+                        : "เพิ่มผู้สอน"
+                    }
+                  />
+                </div>
 
-              <Popover
-                open={instructorOpen}
-                onOpenChange={setInstructorOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11 w-full justify-start px-3"
+                {instructorOpen && (
+                  <div
+                    id="course-instructor-options"
+                    role="listbox"
+                    className="absolute inset-x-0 top-full z-[60] mt-1 max-h-56 overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
                   >
-                    <div className="flex flex-wrap gap-1">
-                      {selectedInstructors.length > 0 ? (
-                        selectedInstructors.map((instructor) => (
-                          <Badge
-                            key={instructor}
-                            variant="outline"
-                            className={instructorBadgeClass}
-                          >
-                            {instructor}
-                            <button
-                              type="button"
-                              className="ml-1 rounded-full text-blue-300 hover:text-white"
-                              onMouseDown={(event) =>
-                                event.preventDefault()
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleInstructor(instructor);
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground">
-                          เลือกผู้สอน
-                        </span>
-                      )}
-                    </div>
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent
-                  align="start"
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                >
-                  <Command>
-                    <CommandInput
-                      value={newInstructor}
-                      onValueChange={setNewInstructor}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addNewInstructor();
-                        }
-                      }}
-                      placeholder="เลือกหรือพิมพ์ชื่อผู้สอน"
-                    />
-
-                    <CommandList>
-                      {newInstructor.trim() && (
-                        <CommandItem
-                          value={`เพิ่มผู้สอน ${newInstructor.trim()}`}
-                          onSelect={addNewInstructor}
-                        >
-                          <PlusCircle className="mr-2 h-4 w-4" />
-                          เพิ่มผู้สอน &quot;{newInstructor.trim()}&quot;
-                        </CommandItem>
-                      )}
-
-                      {availableInstructors.map((instructor) => {
+                    {instructorOptions.length > 0 ? (
+                      instructorOptions.map((option, index) => {
                         const selected =
-                          selectedInstructors.includes(instructor);
+                          option.type === "existing" &&
+                          selectedInstructors.includes(option.name);
 
                         return (
-                          <CommandItem
-                            key={instructor}
-                            value={instructor}
-                            onSelect={() => toggleInstructor(instructor)}
+                          <div
+                            id={`course-instructor-option-${index}`}
+                            key={`${option.type}-${option.name}`}
+                            role="option"
+                            aria-selected={selected}
+                            className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                              index === activeInstructorIndex
+                                ? "bg-accent text-accent-foreground"
+                                : ""
+                            }`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() =>
+                              setActiveInstructorIndex(index)
+                            }
+                            onClick={() => selectInstructorOption(index)}
                           >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                selected ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            {instructor}
-                          </CommandItem>
+                            {option.type === "new" ? (
+                              <>
+                                <PlusCircle className="h-4 w-4" />
+                                เพิ่มผู้สอน &quot;{option.name}&quot;
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex h-4 w-4 items-center justify-center">
+                                  {selected && <Check className="h-4 w-4" />}
+                                </span>
+                                {option.name}
+                              </>
+                            )}
+                          </div>
                         );
-                      })}
-
-                      {!newInstructor.trim() &&
-                        availableInstructors.length === 0 && (
-                          <CommandEmpty>
-                            พิมพ์ชื่อเพื่อเพิ่มผู้สอนใหม่
-                          </CommandEmpty>
-                        )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                      })
+                    ) : (
+                      <div className="px-2 py-2 text-center text-sm text-muted-foreground">
+                        พิมพ์ชื่อเพื่อเพิ่มผู้สอนใหม่
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

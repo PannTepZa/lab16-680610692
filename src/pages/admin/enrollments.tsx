@@ -93,7 +93,9 @@ export default function AdminEnrollmentsPage() {
     loadCourses();
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === COURSES_STORAGE_KEY) loadCourses();
+      if (event.key === COURSES_STORAGE_KEY) {
+        loadCourses();
+      }
     };
 
     window.addEventListener("storage", handleStorageChange);
@@ -132,7 +134,9 @@ export default function AdminEnrollmentsPage() {
       );
     }
 
-    if (selectedStudent === "all") return true;
+    if (selectedStudent === "all") {
+      return true;
+    }
 
     const student = students.find(
       (item) => item.studentId === selectedStudent,
@@ -156,7 +160,9 @@ export default function AdminEnrollmentsPage() {
   };
 
   const handleEnroll = () => {
-    if (!formCourse || formStudents.length === 0) return;
+    if (!formCourse || formStudents.length === 0) {
+      return;
+    }
 
     formStudents.forEach((studentId) => {
       addCourseToStudent(studentId, formCourse);
@@ -181,13 +187,18 @@ export default function AdminEnrollmentsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">จัดการการลงทะเบียน</h1>
+        <h1 className="text-xl font-semibold">
+          จัดการการลงทะเบียน
+        </h1>
 
         <p className="text-sm text-muted-foreground">
           Admin ลงทะเบียนและยกเลิกการลงทะเบียนให้นักศึกษาได้ทุกคน
         </p>
 
-        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={handleDialogChange}
+        >
           <DialogTrigger asChild>
             <Button className="mt-3">
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -217,12 +228,15 @@ export default function AdminEnrollmentsPage() {
 
                   <SelectContent>
                     {adminCourses.length === 0 ? (
-                      <SelectItem value="ไม่มีวิชา" disabled>
+                      <SelectItem value="no-course" disabled>
                         ยังไม่มีวิชาในตารางจัดการวิชาเรียน
                       </SelectItem>
                     ) : (
                       adminCourses.map((course) => (
-                        <SelectItem key={course.id} value={course.code}>
+                        <SelectItem
+                          key={course.id}
+                          value={course.code}
+                        >
                           {course.code} — {course.name}
                         </SelectItem>
                       ))
@@ -327,7 +341,9 @@ export default function AdminEnrollmentsPage() {
 
             <DialogFooter>
               <Button
-                disabled={!formCourse || formStudents.length === 0}
+                disabled={
+                  !formCourse || formStudents.length === 0
+                }
                 onClick={handleEnroll}
               >
                 ลงทะเบียน ({formStudents.length} คน)
@@ -345,8 +361,12 @@ export default function AdminEnrollmentsPage() {
         className="w-fit"
       >
         <TabsList>
-          <TabsTrigger value="course">ค้นหาตามวิชา</TabsTrigger>
-          <TabsTrigger value="student">ค้นหาตามนักศึกษา</TabsTrigger>
+          <TabsTrigger value="course">
+            ค้นหาตามวิชา
+          </TabsTrigger>
+          <TabsTrigger value="student">
+            ค้นหาตามนักศึกษา
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -386,7 +406,8 @@ export default function AdminEnrollmentsPage() {
                 key={student.studentId}
                 value={student.studentId}
               >
-                {student.studentId} — {getStudentName(student.studentId)}
+                {student.studentId} —{" "}
+                {getStudentName(student.studentId)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -402,7 +423,9 @@ export default function AdminEnrollmentsPage() {
               <TableHead className="w-[140px]">
                 จำนวน นศ.
               </TableHead>
-              <TableHead>นักศึกษาที่ลงทะเบียน</TableHead>
+              <TableHead>
+                นักศึกษาที่ลงทะเบียน
+              </TableHead>
             </TableRow>
           </TableHeader>
 
@@ -418,7 +441,9 @@ export default function AdminEnrollmentsPage() {
               </TableRow>
             ) : (
               visibleCourses.map((course) => {
-                const enrolledStudents = getCourseStudents(course.code);
+                const enrolledStudents = getCourseStudents(
+                  course.code,
+                );
 
                 return (
                   <TableRow key={course.id}>
@@ -428,7 +453,9 @@ export default function AdminEnrollmentsPage() {
 
                     <TableCell>{course.name}</TableCell>
 
-                    <TableCell>{enrolledStudents.length}</TableCell>
+                    <TableCell>
+                      {enrolledStudents.length}
+                    </TableCell>
 
                     <TableCell>
                       {enrolledStudents.length > 0 ? (
