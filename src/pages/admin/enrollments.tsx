@@ -204,7 +204,7 @@ export default function AdminEnrollmentsPage() {
             }
           />
 
-          <DialogContent>
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>ลงทะเบียนให้นักศึกษา</DialogTitle>
               <DialogDescription>
@@ -223,7 +223,10 @@ export default function AdminEnrollmentsPage() {
                     handleCourseChange(value ?? "")
                   }
                 >
-                  <SelectTrigger id="enrollment-course">
+                  <SelectTrigger
+                    id="enrollment-course"
+                    className="w-full"
+                  >
                     <SelectValue placeholder="เลือกวิชา" />
                   </SelectTrigger>
 
