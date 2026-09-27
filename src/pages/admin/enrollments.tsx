@@ -55,6 +55,19 @@ type AdminCourse = {
   instructors: string[];
 };
 
+const readAdminCourses = (): AdminCourse[] => {
+  const savedCourses = localStorage.getItem(COURSES_STORAGE_KEY);
+
+  if (!savedCourses) return [];
+
+  try {
+    const parsedCourses = JSON.parse(savedCourses) as AdminCourse[];
+    return Array.isArray(parsedCourses) ? parsedCourses : [];
+  } catch {
+    return [];
+  }
+};
+
 export default function AdminEnrollmentsPage() {
   const {
     students,
@@ -62,7 +75,8 @@ export default function AdminEnrollmentsPage() {
     removeCourseFromStudent,
   } = useEnrollmentStore();
 
-  const [adminCourses, setAdminCourses] = useState<AdminCourse[]>([]);
+  const [adminCourses, setAdminCourses] =
+    useState<AdminCourse[]>(readAdminCourses);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [studentPopoverOpen, setStudentPopoverOpen] = useState(false);
   const [formCourse, setFormCourse] = useState("");
@@ -73,28 +87,10 @@ export default function AdminEnrollmentsPage() {
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState("all");
 
-  const loadCourses = () => {
-    const savedCourses = localStorage.getItem(COURSES_STORAGE_KEY);
-
-    if (!savedCourses) {
-      setAdminCourses([]);
-      return;
-    }
-
-    try {
-      const parsedCourses = JSON.parse(savedCourses) as AdminCourse[];
-      setAdminCourses(Array.isArray(parsedCourses) ? parsedCourses : []);
-    } catch {
-      setAdminCourses([]);
-    }
-  };
-
   useEffect(() => {
-    loadCourses();
-
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === COURSES_STORAGE_KEY) {
-        loadCourses();
+        setAdminCourses(readAdminCourses());
       }
     };
 
@@ -199,30 +195,35 @@ export default function AdminEnrollmentsPage() {
           open={dialogOpen}
           onOpenChange={handleDialogChange}
         >
-          <DialogTrigger asChild>
-            <Button className="mt-3">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              ลงทะเบียนให้นักศึกษา
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button className="mt-3">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                ลงทะเบียนให้นักศึกษา
+              </Button>
+            }
+          />
 
           <DialogContent>
             <DialogHeader>
               <DialogTitle>ลงทะเบียนให้นักศึกษา</DialogTitle>
               <DialogDescription>
-                เลือกวิชาก่อน แล้วเลือกนักศึกษาได้หลายคน
+                เลือกวิชาก่อน แล้วเลือกนักศึกษาที่ยังไม่ได้ลงทะเบียนวิชานั้น
+                (เลือกได้มากกว่า 1 คน)
               </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>วิชา</Label>
+                <Label htmlFor="enrollment-course">วิชา</Label>
 
                 <Select
                   value={formCourse}
-                  onValueChange={handleCourseChange}
+                  onValueChange={(value) =>
+                    handleCourseChange(value ?? "")
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="enrollment-course">
                     <SelectValue placeholder="เลือกวิชา" />
                   </SelectTrigger>
 
@@ -246,53 +247,45 @@ export default function AdminEnrollmentsPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>นักศึกษา</Label>
+                <Label htmlFor="enrollment-students">นักศึกษา</Label>
 
                 <Popover
                   open={studentPopoverOpen}
                   onOpenChange={setStudentPopoverOpen}
                 >
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!formCourse}
-                      className="min-h-11 w-full justify-start px-3"
-                    >
-                      {formStudents.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {formStudents.map((studentId) => (
-                            <Badge
-                              key={studentId}
-                              variant="outline"
-                              className={studentBadgeClass}
-                            >
-                              {getStudentName(studentId)}
-
-                              <button
-                                type="button"
-                                className="ml-1 rounded-full text-blue-300 hover:text-white"
-                                onMouseDown={(event) =>
-                                  event.preventDefault()
-                                }
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleStudent(studentId);
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {formCourse
-                            ? "เลือกนักศึกษา (ได้หลายคน)"
-                            : "กรุณาเลือกวิชาก่อน"}
-                        </span>
-                      )}
-                    </Button>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        id="enrollment-students"
+                        type="button"
+                        variant="outline"
+                        disabled={!formCourse}
+                        className="min-h-11 w-full justify-start px-3"
+                      />
+                    }
+                  >
+                    {formStudents.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {formStudents.map((studentId) => (
+                          <Badge
+                            key={studentId}
+                            variant="outline"
+                            className={studentBadgeClass}
+                          >
+                            {getStudentName(studentId)}
+                            <span aria-hidden="true" className="ml-1">
+                              <X className="h-3 w-3" />
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {formCourse
+                          ? "เลือกนักศึกษา (ได้หลายคน)"
+                          : "กรุณาเลือกวิชาก่อน"}
+                      </span>
+                    )}
                   </PopoverTrigger>
 
                   <PopoverContent
@@ -355,9 +348,11 @@ export default function AdminEnrollmentsPage() {
 
       <Tabs
         value={searchType}
-        onValueChange={(value) =>
-          setSearchType(value as "course" | "student")
-        }
+        onValueChange={(value) => {
+          if (value === "course" || value === "student") {
+            setSearchType(value);
+          }
+        }}
         className="w-fit"
       >
         <TabsList>
@@ -373,7 +368,7 @@ export default function AdminEnrollmentsPage() {
       {searchType === "course" ? (
         <Select
           value={selectedCourse}
-          onValueChange={setSelectedCourse}
+          onValueChange={(value) => setSelectedCourse(value ?? "all")}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="ทุกวิชา" />
@@ -392,7 +387,7 @@ export default function AdminEnrollmentsPage() {
       ) : (
         <Select
           value={selectedStudent}
-          onValueChange={setSelectedStudent}
+          onValueChange={(value) => setSelectedStudent(value ?? "all")}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="ทุกคน" />
@@ -473,7 +468,7 @@ export default function AdminEnrollmentsPage() {
                                 className="ml-1 rounded-full text-blue-300 hover:text-white"
                                 aria-label={`ลบ ${getStudentName(
                                   student.studentId,
-                                )}`}
+                                )} ออกจากวิชา ${course.code}`}
                                 onMouseDown={(event) =>
                                   event.preventDefault()
                                 }
