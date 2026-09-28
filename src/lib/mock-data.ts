@@ -46,8 +46,8 @@ export const courses: Course[] = [
 ];
 
 export const enrollments: Enrollment[] = [
-  { studentId: "650610002", courseId: "CPE301" },
-  { studentId: "650610002", courseId: "CPE302" },
-  { studentId: "650610003", courseId: "ISNE101" },
-  { studentId: "650610003", courseId: "CPE302" },
+  { studentId: "650610002", courseCode: "CPE301" },
+  { studentId: "650610002", courseCode: "CPE302" },
+  { studentId: "650610003", courseCode: "ISNE101" },
+  { studentId: "650610003", courseCode: "CPE302" },
 ];
