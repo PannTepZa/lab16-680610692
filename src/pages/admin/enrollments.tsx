@@ -141,6 +141,25 @@ export default function AdminEnrollmentsPage() {
     return student?.enrolledCourses.includes(course.code);
   });
 
+  const selectedCourseRecord = adminCourses.find(
+    (course) => course.code === selectedCourse,
+  );
+  const selectedCourseLabel =
+    selectedCourse === "all"
+      ? "ทุกวิชา"
+      : selectedCourseRecord
+        ? `${selectedCourseRecord.code} — ${selectedCourseRecord.name}`
+        : "ทุกวิชา";
+  const selectedStudentRecord = students.find(
+    (student) => student.studentId === selectedStudent,
+  );
+  const selectedStudentLabel =
+    selectedStudent === "all"
+      ? "ทุกคน"
+      : selectedStudentRecord
+        ? `${selectedStudentRecord.studentId} — ${getStudentName(selectedStudentRecord.studentId)}`
+        : "ทุกคน";
+
   const toggleStudent = (studentId: string) => {
     setFormStudents((current) =>
       current.includes(studentId)
@@ -374,7 +393,7 @@ export default function AdminEnrollmentsPage() {
           onValueChange={(value) => setSelectedCourse(value ?? "all")}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="ทุกวิชา" />
+            <SelectValue>{selectedCourseLabel}</SelectValue>
           </SelectTrigger>
 
           <SelectContent>
@@ -393,7 +412,7 @@ export default function AdminEnrollmentsPage() {
           onValueChange={(value) => setSelectedStudent(value ?? "all")}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="ทุกคน" />
+            <SelectValue>{selectedStudentLabel}</SelectValue>
           </SelectTrigger>
 
           <SelectContent>
