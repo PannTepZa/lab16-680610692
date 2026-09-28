@@ -1,4 +1,4 @@
-import type { Course, Student } from "@/lib/types";
+import type { Course, Student,Enrollment } from "@/lib/types";
 
 export const students: Student[] = [
   {
@@ -43,4 +43,11 @@ export const courses: Course[] = [
     courseTitle: "Introduction to Information Systems and Network Engineering",
     instructors: ["KENNETH COSH"],
   },
+];
+
+export const enrollments: Enrollment[] = [
+  { studentId: "650610002", courseId: "CPE301" },
+  { studentId: "650610002", courseId: "CPE302" },
+  { studentId: "650610003", courseId: "ISNE101" },
+  { studentId: "650610003", courseId: "CPE302" },
 ];
