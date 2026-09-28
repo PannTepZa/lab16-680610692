@@ -72,31 +72,21 @@ const initialCourses: Course[] = [
     id: "5",
     code: "ISNE101",
     name: "Introduction to Information Systems and Network Engineering",
-    instructors: ["KENNETH COSH"],
+    instructors: ["Kenneth Cosh"],
   },
 ];
-
-const normalizeInstructorNames = (courses: Course[]): Course[] =>
-  courses.map((course) => ({
-    ...course,
-    instructors: course.instructors.map((instructor) =>
-      instructor.toUpperCase(),
-    ),
-  }));
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem(COURSES_STORAGE_KEY);
 
-    if (!saved) return normalizeInstructorNames(initialCourses);
+    if (!saved) return initialCourses;
 
     try {
       const parsed = JSON.parse(saved) as Course[];
-      return Array.isArray(parsed)
-        ? normalizeInstructorNames(parsed)
-        : normalizeInstructorNames(initialCourses);
+      return Array.isArray(parsed) ? parsed : initialCourses;
     } catch {
-      return normalizeInstructorNames(initialCourses);
+      return initialCourses;
     }
   });
 
@@ -167,8 +157,7 @@ export default function AdminCoursesPage() {
         instructor.toLowerCase() === typedName.toLowerCase(),
     );
 
-    const instructorName =
-      existingName?.toUpperCase() ?? typedName.toUpperCase();
+    const instructorName = existingName ?? typedName;
 
     setSelectedInstructors((current) =>
       current.includes(instructorName)
@@ -289,7 +278,7 @@ export default function AdminCoursesPage() {
               courses.map((course) => (
                 <TableRow key={course.id}>
                   <TableCell className="truncate font-medium">
-                    {course.code}
+                    {course.code.toUpperCase()}
                   </TableCell>
 
                   <TableCell className="truncate">{course.name}</TableCell>
@@ -303,7 +292,7 @@ export default function AdminCoursesPage() {
                             variant="outline"
                             className={instructorBadgeClass}
                           >
-                            {instructor.toUpperCase()}
+                            {instructor}
                             <button
                               type="button"
                               className="ml-1 rounded-full text-blue-300 hover:text-white"
