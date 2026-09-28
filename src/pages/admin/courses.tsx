@@ -34,7 +34,7 @@ import {
 const COURSES_STORAGE_KEY = "admin-courses";
 
 const instructorBadgeClass =
-  "border-blue-800 bg-blue-950/60 text-blue-200";
+  "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200";
 
 type Course = {
   id: string;
@@ -295,7 +295,7 @@ export default function AdminCoursesPage() {
                             {instructor}
                             <button
                               type="button"
-                              className="ml-1 rounded-full text-blue-300 hover:text-white"
+                              className="ml-1 rounded-full text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-white"
                               onMouseDown={(event) =>
                                 event.preventDefault()
                               }
@@ -385,7 +385,7 @@ export default function AdminCoursesPage() {
                       {instructor}
                       <button
                         type="button"
-                        className="ml-1 rounded-full text-blue-300 hover:text-white"
+                        className="ml-1 rounded-full text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-white"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => toggleInstructor(instructor)}
                         aria-label={`ลบผู้สอน ${instructor}`}
